@@ -6,6 +6,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.io.IOException;
 import java.nio.file.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -14,6 +15,7 @@ public class SubtitleTranslatorGUI {
     private static final String TARGET_LANG = "vi";
     private JFrame frame;
     private JTextField folderPathField;
+    private JTextField endWithTextField;
     private JPasswordField apiKeyPathField;
     private JTextArea logArea;
     private JButton startButton;
@@ -26,7 +28,7 @@ public class SubtitleTranslatorGUI {
     public SubtitleTranslatorGUI() {
         frame = new JFrame("Tool dịch file sub Anh-Việt (file.srt)");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(500, 200);
+        frame.setSize(500, 400);
         frame.setLayout(new BorderLayout());
 
         JPanel topPanel = new JPanel(new BorderLayout());
@@ -47,6 +49,12 @@ public class SubtitleTranslatorGUI {
         apiKeyPanel.add(apiKeyPathField, BorderLayout.CENTER);
         clearButton.addActionListener(e -> clearAll());
         apiKeyPanel.add(clearButton, BorderLayout.EAST);
+
+        JPanel endWithPanel = new JPanel(new BorderLayout());
+        JLabel endWithLabel = new JLabel("File kết thúc với: ");
+        endWithTextField = new JTextField();
+        endWithPanel.add(endWithLabel, BorderLayout.WEST);
+        endWithPanel.add(endWithTextField, BorderLayout.CENTER);
 
         logArea = new JTextArea();
         logArea.setEditable(false);
@@ -69,7 +77,8 @@ public class SubtitleTranslatorGUI {
         northPanel.setLayout(new BorderLayout());
 
         northPanel.add(topPanel, BorderLayout.NORTH);
-        northPanel.add(apiKeyPanel, BorderLayout.SOUTH);
+        northPanel.add(apiKeyPanel, BorderLayout.CENTER);
+        northPanel.add(endWithPanel, BorderLayout.SOUTH);
 
         frame.add(northPanel, BorderLayout.NORTH);
         frame.add(scrollPane, BorderLayout.CENTER);
@@ -84,6 +93,7 @@ public class SubtitleTranslatorGUI {
     private void clearAll() {
         folderPathField.setText("");
         apiKeyPathField.setText("");
+        endWithTextField.setText("");
     }
     private void chooseFolder() {
         JFileChooser chooser = new JFileChooser();
@@ -141,17 +151,59 @@ public class SubtitleTranslatorGUI {
 
     private List<Path> findSrtFiles(String folderPath) throws IOException {
         return Files.walk(Paths.get(folderPath))
-                .filter(path -> path.toString().endsWith("_en.srt"))
+                .filter(path -> path.toString().endsWith(endWithTextField.getText() + ".srt"))
                 .collect(Collectors.toList());
     }
 
     private void processFile(Path file, Translate translate) throws IOException {
         List<String> lines = Files.readAllLines(file);
-        List<String> translatedLines = lines.stream()
-                .map(line -> translateText(line, translate))
-                .collect(Collectors.toList());
+        List<String> cleanedLines = new ArrayList<>();
+        StringBuilder currentText = new StringBuilder();
 
-        String newFileName = file.toString().replace("_en.srt", "_vi_cv.srt");
+        boolean foundTimestamp = false; // Biến đánh dấu đã tìm thấy timestamp đầu tiên
+
+        for (String line : lines) {
+            line = line.trim();
+            if (line.isEmpty()) continue;
+
+            // Nếu tìm thấy dòng thời gian đầu tiên, bắt đầu xử lý file
+            if (line.matches("\\d{2}:\\d{2}:\\d{2},\\d{3} --> \\d{2}:\\d{2}:\\d{2},\\d{3}")) {
+                foundTimestamp = true; // Đánh dấu đã tìm thấy timestamp đầu tiên
+
+                // Nếu có nội dung trước đó, thêm vào danh sách
+                if (currentText.length() > 0) {
+                    cleanedLines.add(currentText.toString());
+                    cleanedLines.add(""); // Thêm dòng trống giữa các đoạn
+                    currentText.setLength(0);
+                }
+                cleanedLines.add(line);
+            } else if (foundTimestamp) {
+                // Chỉ xử lý nội dung nếu đã tìm thấy timestamp đầu tiên
+                if (currentText.length() > 0) {
+                    currentText.append(" ");
+                }
+                currentText.append(line);
+            }
+        }
+
+        // Thêm đoạn cuối cùng vào danh sách
+        if (currentText.length() > 0) {
+            cleanedLines.add(currentText.toString());
+            cleanedLines.add("");
+        }
+
+        List<String> translatedLines = new ArrayList<>();
+
+        for (String line : cleanedLines) {
+            // Không dịch dòng thời gian
+            if (line.matches("\\d{2}:\\d{2}:\\d{2},\\d{3} --> \\d{2}:\\d{2}:\\d{2},\\d{3}")) {
+                translatedLines.add(line);
+            } else {
+                translatedLines.add(translateText(line, translate));
+            }
+        }
+
+        String newFileName = file.toString().replace(".srt", "_vi_cv.srt");
         Files.write(Paths.get(newFileName), translatedLines);
 
         logArea.append("Đã dịch: " + newFileName + "\n");
