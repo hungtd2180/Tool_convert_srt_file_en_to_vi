@@ -129,10 +129,10 @@ public class SubtitleTranslatorGUI {
     private void startTranslation() {
         progressBar.setValue(0);
         startButtonStatus(true);
-        logArea.append("Đang chuẩn bị dịch sub file.srt từ tiếng Anh sang tiếng Việt...\n");
+        appendLog("Đang chuẩn bị dịch sub file.srt từ tiếng Anh sang tiếng Việt...\n");
         String folderPath = folderPathField.getText().trim();
         if (folderPath.isEmpty()) {
-            logArea.append("Vui lòng chọn thư mục!\n");
+            appendLog("Vui lòng chọn thư mục!\n");
             startButtonStatus(false);
             return;
         }
@@ -140,7 +140,7 @@ public class SubtitleTranslatorGUI {
         new Thread(() -> {
             try {
                 if (apiKeyPathField.getText().trim().isEmpty()) {
-                    logArea.append("Hãy nhập Cloud Translation API Key của bạn!\n");
+                    appendLog("Hãy nhập Cloud Translation API Key của bạn!\n");
                     startButtonStatus(false);
                     return;
                 }
@@ -154,9 +154,10 @@ public class SubtitleTranslatorGUI {
                     SwingUtilities.invokeLater(() -> progressBar.setValue(progress));
                 }
                 startButtonStatus(false);
-                logArea.append("Dịch hoàn tất!\n");
+                appendLog("Dịch hoàn tất!\n");
             } catch (Exception e) {
-                logArea.append("Error: " + e.getMessage() + "\n");
+                appendLog("Error: " + e.getMessage() + "\n");
+                startButtonStatus(false);
                 e.printStackTrace();
             }
         }).start();
@@ -213,16 +214,16 @@ public class SubtitleTranslatorGUI {
                 translatedLines.add(line);
             } else {
                 if (isBilingual) {
-                    translatedLines.add(line);
+                    translatedLines.add(line.replaceAll("\\s*\\d+$", ""));
                 }
-                translatedLines.add(translateText(line, translate));
+                translatedLines.add(translateText(line, translate).replaceAll("\\s*\\d+$", ""));
             }
         }
 
-        String newFileName = file.toString().replace(".srt", isBilingual ? "_vi-en.srt" : "_vi.srt");
+        String newFileName = file.toString().replace(endWithTextField.getText()+".srt", isBilingual ? "_vi-en.srt" : "_vi.srt");
         Files.write(Paths.get(newFileName), translatedLines);
 
-        logArea.append("Đã dịch: " + newFileName + "\n");
+        appendLog("Đã dịch: " + newFileName + "\n");
     }
 
     private String translateText(String text, Translate translate) {
@@ -230,5 +231,9 @@ public class SubtitleTranslatorGUI {
                 Translate.TranslateOption.sourceLanguage(SOURCE_LANG),
                 Translate.TranslateOption.targetLanguage(TARGET_LANG));
         return translation.getTranslatedText().replace("--&gt;", "-->");
+    }
+    private void appendLog(String message) {
+        logArea.append(message + "\n");
+        logArea.setCaretPosition(logArea.getDocument().getLength()); // Cuộn xuống cuối
     }
 }
