@@ -20,6 +20,8 @@ public class SubtitleTranslatorGUI {
     private JTextArea logArea;
     private JButton startButton;
     private JProgressBar progressBar;
+    private JRadioButton enToViButton;
+    private JRadioButton enToViEnButton;
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(SubtitleTranslatorGUI::new);
@@ -28,26 +30,28 @@ public class SubtitleTranslatorGUI {
     public SubtitleTranslatorGUI() {
         frame = new JFrame("Tool dịch file sub Anh-Việt (file.srt)");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(500, 400);
-        frame.setLayout(new BorderLayout());
+        frame.setSize(500, 500);
+        frame.setLayout(new BorderLayout(10, 10));
 
-        JPanel topPanel = new JPanel(new BorderLayout());
+        JPanel topPanel = new JPanel(new GridLayout(5, 1, 5, 5));
+
         folderPathField = new JTextField();
         JButton browseButton = new JButton("Tìm kiếm");
         browseButton.addActionListener(e -> chooseFolder());
         JLabel urlLabel = new JLabel("Đường dẫn folder: ");
 
-        topPanel.add(urlLabel, BorderLayout.WEST);
-        topPanel.add(folderPathField, BorderLayout.CENTER);
-        topPanel.add(browseButton, BorderLayout.EAST);
+        JPanel folderPanel = new JPanel(new BorderLayout());
+        folderPanel.add(urlLabel, BorderLayout.WEST);
+        folderPanel.add(folderPathField, BorderLayout.CENTER);
+        folderPanel.add(browseButton, BorderLayout.EAST);
 
         JPanel apiKeyPanel = new JPanel(new BorderLayout());
         apiKeyPathField = new JPasswordField();
         JLabel apiKeyLabel = new JLabel("Cloud Translation API Key: ");
         JButton clearButton = new JButton("Xoá hết");
+        clearButton.addActionListener(e -> clearAll());
         apiKeyPanel.add(apiKeyLabel, BorderLayout.WEST);
         apiKeyPanel.add(apiKeyPathField, BorderLayout.CENTER);
-        clearButton.addActionListener(e -> clearAll());
         apiKeyPanel.add(clearButton, BorderLayout.EAST);
 
         JPanel endWithPanel = new JPanel(new BorderLayout());
@@ -56,7 +60,23 @@ public class SubtitleTranslatorGUI {
         endWithPanel.add(endWithLabel, BorderLayout.WEST);
         endWithPanel.add(endWithTextField, BorderLayout.CENTER);
 
-        logArea = new JTextArea();
+        JPanel modePanel = new JPanel(new FlowLayout());
+        JLabel modeLabel = new JLabel("Chế độ dịch: ");
+        enToViButton = new JRadioButton("Anh -> Việt", true);
+        enToViEnButton = new JRadioButton("Anh -> Việt + Anh");
+        ButtonGroup modeGroup = new ButtonGroup();
+        modeGroup.add(enToViButton);
+        modeGroup.add(enToViEnButton);
+        modePanel.add(modeLabel);
+        modePanel.add(enToViButton);
+        modePanel.add(enToViEnButton);
+
+        topPanel.add(folderPanel);
+        topPanel.add(apiKeyPanel);
+        topPanel.add(endWithPanel);
+        topPanel.add(modePanel);
+
+        logArea = new JTextArea(10, 40);
         logArea.setEditable(false);
         logArea.setLineWrap(true);
         logArea.setWrapStyleWord(true);
@@ -73,14 +93,7 @@ public class SubtitleTranslatorGUI {
         bottomPanel.add(startButton, BorderLayout.NORTH);
         bottomPanel.add(progressBar, BorderLayout.SOUTH);
 
-        JPanel northPanel = new JPanel();
-        northPanel.setLayout(new BorderLayout());
-
-        northPanel.add(topPanel, BorderLayout.NORTH);
-        northPanel.add(apiKeyPanel, BorderLayout.CENTER);
-        northPanel.add(endWithPanel, BorderLayout.SOUTH);
-
-        frame.add(northPanel, BorderLayout.NORTH);
+        frame.add(topPanel, BorderLayout.NORTH);
         frame.add(scrollPane, BorderLayout.CENTER);
         frame.add(bottomPanel, BorderLayout.SOUTH);
 
@@ -123,7 +136,7 @@ public class SubtitleTranslatorGUI {
             startButtonStatus(false);
             return;
         }
-
+        Boolean isBilingual = enToViEnButton.isSelected();
         new Thread(() -> {
             try {
                 if (apiKeyPathField.getText().trim().isEmpty()) {
@@ -136,7 +149,7 @@ public class SubtitleTranslatorGUI {
                 int totalFiles = srtFiles.size();
 
                 for (int i = 0; i < totalFiles; i++) {
-                    processFile(srtFiles.get(i), translate);
+                    processFile(srtFiles.get(i), translate, isBilingual);
                     int progress = (int) (((i + 1) / (double) totalFiles) * 100);
                     SwingUtilities.invokeLater(() -> progressBar.setValue(progress));
                 }
@@ -155,7 +168,7 @@ public class SubtitleTranslatorGUI {
                 .collect(Collectors.toList());
     }
 
-    private void processFile(Path file, Translate translate) throws IOException {
+    private void processFile(Path file, Translate translate, Boolean isBilingual) throws IOException {
         List<String> lines = Files.readAllLines(file);
         List<String> cleanedLines = new ArrayList<>();
         StringBuilder currentText = new StringBuilder();
@@ -199,11 +212,14 @@ public class SubtitleTranslatorGUI {
             if (line.matches("\\d{2}:\\d{2}:\\d{2},\\d{3} --> \\d{2}:\\d{2}:\\d{2},\\d{3}")) {
                 translatedLines.add(line);
             } else {
+                if (isBilingual) {
+                    translatedLines.add(line);
+                }
                 translatedLines.add(translateText(line, translate));
             }
         }
 
-        String newFileName = file.toString().replace(".srt", "_vi_cv.srt");
+        String newFileName = file.toString().replace(".srt", isBilingual ? "_vi-en.srt" : "_vi.srt");
         Files.write(Paths.get(newFileName), translatedLines);
 
         logArea.append("Đã dịch: " + newFileName + "\n");
