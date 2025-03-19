@@ -524,7 +524,7 @@ public class SubtitleTranslatorGUI {
                 .build();
         AudioConfig audioConfig = AudioConfig.newBuilder()
                 .setAudioEncoding(AudioEncoding.MP3)
-                .setSpeakingRate(1.5) // Giữ tốc độ mặc định, điều chỉnh thời lượng sau
+                .setSpeakingRate(1.4) // Giữ tốc độ mặc định, điều chỉnh thời lượng sau
                 .build();
 
         SynthesizeSpeechResponse response = text2Speech.synthesizeSpeech(input, voice, audioConfig);
